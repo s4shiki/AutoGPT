@@ -1,0 +1,13 @@
+# docker-compose.yml
+version: "3"
+services:
+  frontend:
+    working_dir: /app
+    build: .
+    ports:
+      - "8888:8888"
+    volumes:
+      - .:/app
+      - flutter_cache:/root/.pub-cache
+volumes:
+  flutter_cache:

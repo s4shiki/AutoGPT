@@ -1,0 +1,67 @@
+version: "3.9"
+
+services:
+  frontend:
+    working_dir: /app
+    build: ./frontend
+    ports:
+      - "8888:8888"
+    volumes:
+      - ./frontend:/app
+      - flutter_cache:/root/.pub-cache
+    networks:
+      - app_network
+    depends_on:
+      - auto-gpt
+    command: /bin/sh -c "flutter clean && flutter pub get && flutter pub upgrade && flutter pub cache repair && flutter run -d web-server --web-port=8888 --web-hostname=0.0.0.0"
+
+  auto-gpt:
+    build: ./autogpts/autogpt
+    env_file:
+      - ./autogpts/autogpt/.env
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./autogpts/autogpt/:/app
+      - ./autogpts/autogpt/docker-compose.yml:/app/docker-compose.yml:ro
+      - ./autogpts/autogpt/Dockerfile:/app/Dockerfile:ro
+    networks:
+      - app_network
+    command: serve
+
+  autogpt-test:
+    build: ./autogpts/autogpt
+    env_file:
+      - ./autogpts/autogpt/.env
+    environment:
+      S3_ENDPOINT_URL: http://minio:9000
+      AWS_ACCESS_KEY_ID: minio
+      AWS_SECRET_ACCESS_KEY: minio123
+    entrypoint: ["poetry", "run"]
+    command: ["pytest", "-v"]
+    volumes:
+      - ./autogpts/autogpt/autogpt:/app/autogpt
+      - ./autogpts/autogpt/tests:/app/tests
+    depends_on:
+      - minio
+    profiles: ["exclude-from-up"]
+
+  minio:
+    image: minio/minio
+    environment:
+      MINIO_ACCESS_KEY: minio
+      MINIO_SECRET_KEY: minio123
+    ports:
+      - 9000:9000
+    volumes:
+      - minio-data:/data
+    command: server /data
+    profiles: ["exclude-from-up"]
+
+volumes:
+  flutter_cache:
+  minio-data:
+
+networks:
+  app_network:
+    driver: bridge
